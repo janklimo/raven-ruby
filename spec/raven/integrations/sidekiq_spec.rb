@@ -28,9 +28,27 @@ if RUBY_VERSION > '2.0'
         :extra => { :sidekiq => context }
       }
 
-      expect(Raven).to receive(:capture_exception).with(exception, expected_options)
+      expect(Raven::Event).to receive(:new).with(hash_including(expected_options))
 
       Raven::SidekiqErrorHandler.new.call(exception, context)
+    end
+
+    context "when the captured exception is already annotated" do
+      it "does a deep merge of options" do
+        exception = build_exception
+        Raven.annotate_exception(exception, { :extra => { :job_title => "engineer" } })
+        expected_options = {
+          :message => exception.message,
+          :extra => {
+            :sidekiq => context,
+            :job_title => "engineer"
+          }
+        }
+
+        expect(Raven::Event).to receive(:new).with(hash_including(expected_options))
+
+        Raven::SidekiqErrorHandler.new.call(exception, context)
+      end
     end
 
     it "filters out ActiveJob keys" do
@@ -45,7 +63,7 @@ if RUBY_VERSION > '2.0'
         :extra => { :sidekiq => expected_context }
       }
 
-      expect(Raven).to receive(:capture_exception).with(exception, expected_options)
+      expect(Raven::Event).to receive(:new).with(hash_including(expected_options))
 
       Raven::SidekiqErrorHandler.new.call(exception, aj_context)
     end
